@@ -1,0 +1,1892 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Misi Kata Adjektif: Misi Digital di Dunia Ejen Ali (V2)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Orbitron & Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Orbitron:wght@600;700;900&display=swap" rel="stylesheet">
+    <!-- Tone.js untuk kesan bunyi sintetik Web Audio -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- MediaPipe Tasks Vision -->
+    <script type="module">
+        import {
+            FilesetResolver,
+            HandLandmarker,
+            PoseLandmarker
+        } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
+        window.FilesetResolver = FilesetResolver;
+        window.HandLandmarker = HandLandmarker;
+        window.PoseLandmarker = PoseLandmarker;
+        window.mediaPipeLoaded = true;
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #030712;
+            color: #f8fafc;
+            overflow: hidden;
+            user-select: none;
+        }
+        .font-tech {
+            font-family: 'Orbitron', sans-serif;
+        }
+        .scanlines {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 240, 255, 0.04) 50%,
+                rgba(0, 240, 255, 0.04)
+            );
+            background-size: 100% 4px;
+        }
+        .holo-panel {
+            background: rgba(8, 16, 34, 0.82);
+            backdrop-filter: blur(12px);
+            border: 1.5px solid rgba(6, 182, 212, 0.5);
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.25), inset 0 0 15px rgba(6, 182, 212, 0.1);
+        }
+        .virtual-btn {
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+        }
+        .virtual-btn.hovered {
+            transform: scale(1.06);
+            box-shadow: 0 0 25px rgba(34, 211, 238, 0.9), inset 0 0 10px rgba(255, 255, 255, 0.5);
+            border-color: #ffffff;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.85); opacity: 1; }
+            100% { transform: translateY(-70px) scale(1.25); opacity: 0; }
+        }
+        .animate-float-up {
+            animation: floatUp 1.05s ease-out forwards;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(6, 182, 212, 0.9); }
+        }
+        .glow-pulse {
+            animation: pulseGlow 2s infinite;
+        }
+        @keyframes irisExplode {
+            0% { transform: scale(1); opacity: 1; filter: brightness(2); }
+            100% { transform: scale(1.9); opacity: 0; filter: brightness(3); }
+        }
+        .iris-burst {
+            animation: irisExplode 0.35s ease-out forwards;
+        }
+        @keyframes staggeredFadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-stagger {
+            opacity: 0;
+            animation: staggeredFadeIn 0.45s ease-out forwards;
+        }
+        .falling-iris.hovered {
+            transform: scale(1.12);
+            filter: drop-shadow(0 0 18px #22d3ee);
+        }
+        #virtual-cursor {
+            pointer-events: none;
+            z-index: 9999;
+            transition: width 0.08s, height 0.08s, background-color 0.08s;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative flex items-center justify-center">
+
+    <!-- Latar Belakang Kamera Langsung (Dicerminkan) -->
+    <video id="webcam" autoplay playsinline muted class="fixed inset-0 w-full h-full object-cover transform -scale-x-100 z-0 opacity-70"></video>
+    
+    <!-- Kanvas Visual Rangka Tangan & Badan -->
+    <canvas id="skeleton-canvas" class="fixed inset-0 w-full h-full pointer-events-none z-10 transform -scale-x-100"></canvas>
+    
+    <!-- Lapisan Grid Futuristik & Vignette -->
+    <div class="fixed inset-0 scanlines pointer-events-none z-10 bg-[radial-gradient(circle_at_center,transparent_35%,rgba(2,6,23,0.85)_100%)]"></div>
+
+    <!-- KURSOR MAYA JARI TELUNJUK -->
+    <div id="virtual-cursor" class="fixed hidden items-center justify-center rounded-full border-2 border-cyan-300 bg-cyan-400/35 shadow-[0_0_22px_#22d3ee]" style="width: 38px; height: 38px; transform: translate(-50%, -50%);">
+        <div id="cursor-core" class="w-3 h-3 bg-white rounded-full shadow-[0_0_10px_#fff]"></div>
+        <div id="cursor-ring" class="absolute inset-0 rounded-full border-2 border-amber-400 scale-125 opacity-0 transition-opacity"></div>
+    </div>
+
+    <!-- HUD ATAS (Dipaparkan Semasa Bermain) -->
+    <header id="game-hud" class="fixed top-0 left-0 right-0 z-30 hidden justify-between items-start p-3 md:p-5 pointer-events-none">
+        <!-- Atas Kiri: Info Misi & Kemajuan -->
+        <div class="holo-panel rounded-2xl p-3 md:p-4 max-w-xs md:max-w-sm border-l-4 border-l-cyan-400">
+            <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 text-xs font-tech font-bold bg-red-600 text-white rounded uppercase tracking-wider">M.A.T.A. OS</span>
+                <span id="hud-mission-title" class="font-tech text-sm md:text-base font-bold text-cyan-300">MISI 1: PADANAN TENAGA</span>
+            </div>
+            <div class="mt-2">
+                <div class="flex justify-between text-xs text-slate-300 mb-1 font-semibold">
+                    <span id="hud-progress-label">Sasaran Padanan Seterusnya</span>
+                    <span id="hud-progress-text" class="text-amber-400 font-tech">0 / 2</span>
+                </div>
+                <div class="w-full h-3 bg-slate-900/90 rounded-full overflow-hidden border border-cyan-500/40">
+                    <div id="hud-progress-bar" class="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-amber-400 transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-xs text-cyan-200">
+                <span id="hud-sub-status">Soalan Selesai: <strong id="hud-q-count" class="text-white">0 / 5</strong></span>
+                <span id="hud-control-badge" class="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-500/50 text-cyan-300">Jawapan: Bil. Jari</span>
+            </div>
+        </div>
+
+        <!-- Atas Kanan: Markah, Kombo & Status Sensor -->
+        <div class="flex flex-col items-end gap-2">
+            <div class="holo-panel rounded-2xl p-3 md:p-4 text-right border-r-4 border-r-amber-400">
+                <div class="text-xs text-cyan-300 font-tech uppercase tracking-widest">Markah Ejen</div>
+                <div id="hud-score" class="text-2xl md:text-4xl font-tech font-black text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]">0</div>
+                <div id="hud-combo-badge" class="mt-1 inline-block px-2.5 py-0.5 rounded-full bg-gradient-to-r from-red-600 to-amber-500 text-white font-tech text-xs font-bold opacity-0 transition-opacity">
+                    KOMBO x2!
+                </div>
+            </div>
+            <!-- Penunjuk Status Pengesanan Langsung -->
+            <div class="holo-panel rounded-xl px-3 py-1.5 flex items-center gap-3 text-xs">
+                <div class="flex items-center gap-1.5">
+                    <span id="dot-hand" class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    <span class="text-slate-300">Tangan (<span id="hand-count-label">0</span>)</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <span id="dot-pose" class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    <span class="text-slate-300">Badan</span>
+                </div>
+                <button id="btn-fallback-mouse" class="pointer-events-auto ml-1 px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded border border-cyan-500/30 text-[10px]" title="Guna tetikus sebagai sandaran">
+                    Mod Tetikus: OFF
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- KAWASAN PERMAINAN PADANAN 3 (MISI 1 & MISI 2) -->
+    <main id="board-container" class="relative z-20 hidden flex-col items-center justify-center w-full h-full p-2">
+        <div id="floating-feedback" class="fixed inset-0 pointer-events-none flex items-center justify-center z-50"></div>
+
+        <!-- Papan Padanan 3 (7x7 Grid) -->
+        <div class="holo-panel p-2.5 md:p-4 rounded-3xl relative glow-pulse mt-16 md:mt-12">
+            <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-950 border border-cyan-400 px-4 py-0.5 rounded-full text-[11px] font-tech text-cyan-300 tracking-widest uppercase shadow-lg whitespace-nowrap">
+                TERAS TENAGA I.R.I.S. • GRID 7×7
+            </div>
+            
+            <div id="match3-grid" class="grid grid-cols-7 gap-1.5 md:gap-2 w-[315px] h-[315px] sm:w-[385px] sm:h-[385px] md:w-[440px] md:h-[440px]">
+                <!-- Sel dijana melalui JS -->
+            </div>
+
+            <div class="mt-2.5 text-center text-xs md:text-sm text-cyan-200 font-medium bg-slate-950/70 py-1.5 px-3 rounded-xl border border-cyan-500/20">
+                <span class="text-amber-400 font-bold">CUBIT (Ibu Jari + Telunjuk)</span> objek tenaga & cubit objek bersebelahan untuk tukar!
+            </div>
+        </div>
+    </main>
+
+    <!-- KAWASAN PERMAINAN MISI 3 — I.R.I.S. JATUH -->
+    <section id="iris-fall-container" class="fixed inset-0 z-20 hidden overflow-hidden">
+        <!-- Senarai Lencana 5 Kata Adjektif yang Perlu Dikumpul -->
+        <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 holo-panel rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-center gap-2 border border-cyan-400/70 max-w-xl w-[94%]">
+            <span class="text-xs font-tech text-cyan-300 mr-1">SASARAN KATA ADJEKTIF:</span>
+            <span id="badge-word-kecil" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-600 text-slate-400 font-bold text-xs md:text-sm">kecil</span>
+            <span id="badge-word-tinggi" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-600 text-slate-400 font-bold text-xs md:text-sm">tinggi</span>
+            <span id="badge-word-sedih" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-600 text-slate-400 font-bold text-xs md:text-sm">sedih</span>
+            <span id="badge-word-marah" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-600 text-slate-400 font-bold text-xs md:text-sm">marah</span>
+            <span id="badge-word-kecewa" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-600 text-slate-400 font-bold text-xs md:text-sm">kecewa</span>
+        </div>
+
+        <!-- Lapisan Objek I.R.I.S. Jatuh -->
+        <div id="iris-spawn-layer" class="relative w-full h-full"></div>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- SKRIN-SKRIN ANTARA MUKA (MODAL / OVERLAY) -->
+    <!-- ===================================================================== -->
+
+    <!-- 1. SKRIN PENGENALAN -->
+    <section id="screen-intro" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+        <div class="holo-panel rounded-3xl max-w-2xl w-full p-6 md:p-8 text-center relative overflow-hidden border-2 border-cyan-400">
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-600/20 border border-red-500 text-red-400 font-tech text-xs md:text-sm font-bold tracking-wider mb-4">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                AKADEMI M.A.T.A. • SISTEM LATIHAN INTERAKTIF
+            </div>
+
+            <!-- Ikon I.R.I.S. Ejen Ali -->
+            <div class="mx-auto w-20 h-20 md:w-24 md:h-24 mb-4 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-700 p-0.5 shadow-[0_0_30px_rgba(6,182,212,0.6)]">
+                <div class="w-full h-full bg-slate-950 rounded-2xl flex items-center justify-center">
+                    <svg class="w-14 h-14 text-cyan-400" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polygon points="32,4 58,18 58,46 32,60 6,46 6,18" fill="rgba(6,182,212,0.15)"/>
+                        <path d="M16 28 L26 24 L38 24 L48 28 L42 36 L22 36 Z" fill="#06b6d4" stroke="#ffffff" stroke-width="2"/>
+                        <circle cx="32" cy="30" r="3" fill="#ef4444"/>
+                        <path d="M20 44 L32 48 L44 44" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                    </svg>
+                </div>
+            </div>
+
+            <h1 class="font-tech text-2xl sm:text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-amber-400 tracking-wide">
+                MISI KATA ADJEKTIF
+            </h1>
+            <h2 class="font-tech text-sm sm:text-lg font-bold text-red-400 tracking-widest mt-1">
+                MISI DIGITAL DI DUNIA EJEN ALI
+            </h2>
+
+            <div class="flex flex-wrap justify-center gap-3 my-4 text-xs md:text-sm">
+                <span class="px-3 py-1 rounded-lg bg-blue-950/90 border border-blue-500/50 text-cyan-200">
+                    📚 Mata Pelajaran: <strong>Bahasa Melayu</strong>
+                </span>
+                <span class="px-3 py-1 rounded-lg bg-amber-950/90 border border-amber-500/50 text-amber-300">
+                    🎯 Sasaran: <strong>Murid Tahun 4</strong>
+                </span>
+            </div>
+
+            <p class="text-slate-200 text-sm md:text-base leading-relaxed bg-slate-900/70 p-4 rounded-2xl border border-cyan-500/30 mb-6">
+                “Selamat datang, ejen muda! Padankan teras tenaga digital, jawab soalan menggunakan isyarat tangan, dan tangkap peranti <span class="text-cyan-400 font-bold">I.R.I.S. Kata Adjektif</span>!”
+            </p>
+
+            <button data-action="to-camera-setup" class="virtual-btn w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-tech font-black text-base md:text-lg tracking-wider shadow-[0_0_25px_rgba(6,182,212,0.6)] border-2 border-cyan-200 cursor-pointer">
+                🚀 MULA MISI
+            </button>
+        </div>
+    </section>
+
+    <!-- 2. SKRIN KHAS NOTA PEMBELAJARAN SEBELUM PERMAINAN ("JOM KENALI KATA ADJEKTIF!") -->
+    <section id="screen-notes" class="fixed inset-0 z-40 hidden items-center justify-center p-3 md:p-5 bg-slate-950/75 backdrop-blur-sm">
+        <div class="holo-panel rounded-3xl max-w-5xl w-full p-4 sm:p-6 md:p-7 border-2 border-cyan-400 max-h-[95vh] overflow-y-auto relative shadow-[0_0_40px_rgba(6,182,212,0.35)]">
+            <!-- Tajuk Utama Hologram -->
+            <div class="text-center mb-4">
+                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/90 border border-cyan-400/60 text-cyan-300 font-tech text-[11px] md:text-xs font-bold tracking-widest mb-1.5">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                    PUSAT KAWALAN MISI M.A.T.A. • MODUL PEMBELAJARAN
+                </span>
+                <h2 class="font-tech text-2xl sm:text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-amber-400 drop-shadow-[0_0_12px_rgba(34,211,238,0.4)]">
+                    JOM KENALI KATA ADJEKTIF!
+                </h2>
+            </div>
+
+            <!-- Bahagian 1: Apa itu kata adjektif? -->
+            <div class="bg-gradient-to-r from-blue-950/90 via-slate-900/95 to-blue-950/90 p-4 rounded-2xl border-l-4 border-l-amber-400 border border-cyan-500/40 mb-4 glow-pulse">
+                <h3 class="font-tech text-sm md:text-base font-bold text-amber-400 mb-1 flex items-center gap-2">
+                    <span>💡</span> APA ITU KATA ADJEKTIF?
+                </h3>
+                <p class="text-white text-sm sm:text-base md:text-lg font-semibold leading-relaxed">
+                    “Kata adjektif ialah perkataan yang menerangkan sifat atau keadaan sesuatu kata nama.”
+                </p>
+                <p class="text-cyan-200 text-xs sm:text-sm md:text-base mt-1 leading-relaxed">
+                    Kata adjektif digunakan untuk menerangkan ciri, keadaan atau sifat seseorang, haiwan, benda dan tempat.
+                </p>
+            </div>
+
+            <!-- Grid 2 Kolum: 10 Contoh Ayat & 8 Jenis Kata Adjektif (Tanpa Sebarang Jawapan Permainan) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+                <!-- Kolum Kiri (7 kolum): 10 Contoh Kata Adjektif -->
+                <div class="lg:col-span-7 bg-slate-900/90 p-4 rounded-2xl border border-cyan-500/40">
+                    <h3 class="font-tech text-xs sm:text-sm font-bold text-cyan-300 uppercase tracking-wider mb-2.5 flex items-center gap-2">
+                        <span>✨</span> CONTOH KATA ADJEKTIF DALAM AYAT
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm md:text-base">
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">cantik</span> – bunga itu sangat <strong class="text-amber-300 underline decoration-cyan-400">cantik</strong>.
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">besar</span> – rumah itu sangat <strong class="text-amber-300 underline decoration-cyan-400">besar</strong>.
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">panjang</span> – tali itu <strong class="text-amber-300 underline decoration-cyan-400">panjang</strong>.
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">lembut</span> – bantal itu <strong class="text-amber-300 underline decoration-cyan-400">lembut</strong>.
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">wangi</span> – bunga itu sangat <strong class="text-amber-300 underline decoration-cyan-400">wangi</strong>.
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">pahit</span> – ubat itu <strong class="text-amber-300 underline decoration-cyan-400">pahit</strong>.
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">bersih</span> – bilik itu <strong class="text-amber-300 underline decoration-cyan-400">bersih</strong>.
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">sempit</span> – lorong itu <strong class="text-amber-300 underline decoration-cyan-400">sempit</strong>.
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">cepat</span> – kereta itu bergerak dengan <strong class="text-amber-300 underline decoration-cyan-400">cepat</strong>.
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-950/85 border border-cyan-500/25 text-slate-200">
+                            <span class="px-2 py-0.5 rounded bg-cyan-500/25 text-cyan-300 font-extrabold border border-cyan-400/50">takut</span> – adik berasa <strong class="text-amber-300 underline decoration-cyan-400">takut</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kolum Kanan (5 kolum): 8 Jenis-jenis Kata Adjektif -->
+                <div class="lg:col-span-5 bg-slate-900/90 p-4 rounded-2xl border border-amber-400/40 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-tech text-xs sm:text-sm font-bold text-amber-400 uppercase tracking-wider mb-2.5 flex items-center gap-2">
+                            <span>🗂️</span> JENIS-JENIS KATA ADJEKTIF
+                        </h3>
+                        <ul class="space-y-1.5 text-xs sm:text-sm md:text-[15px] text-slate-200">
+                            <li class="px-2.5 py-1.5 rounded-lg bg-slate-950/85 border border-slate-700/80">
+                                <strong class="text-cyan-300">1. Sifat atau keadaan</strong> – <span class="text-amber-300 font-semibold">cantik, bersih</span>
+                            </li>
+                            <li class="px-2.5 py-1.5 rounded-lg bg-slate-950/85 border border-slate-700/80">
+                                <strong class="text-cyan-300">2. Ukuran</strong> – <span class="text-amber-300 font-semibold">besar, panjang</span>
+                            </li>
+                            <li class="px-2.5 py-1.5 rounded-lg bg-slate-950/85 border border-slate-700/80">
+                                <strong class="text-cyan-300">3. Bentuk</strong> – <span class="text-amber-300 font-semibold">bujur, leper</span>
+                            </li>
+                            <li class="px-2.5 py-1.5 rounded-lg bg-slate-950/85 border border-slate-700/80">
+                                <strong class="text-cyan-300">4. Pancaindera</strong> – <span class="text-amber-300 font-semibold">wangi, pahit</span>
+                            </li>
+                            <li class="px-2.5 py-1.5 rounded-lg bg-slate-950/85 border border-slate-700/80">
+                                <strong class="text-cyan-300">5. Perasaan</strong> – <span class="text-amber-300 font-semibold">takut, tenang</span>
+                            </li>
+                            <li class="px-2.5 py-1.5 rounded-lg bg-slate-950/85 border border-slate-700/80">
+                                <strong class="text-cyan-300">6. Cara</strong> – <span class="text-amber-300 font-semibold">cepat, mudah</span>
+                            </li>
+                            <li class="px-2.5 py-1.5 rounded-lg bg-slate-950/85 border border-slate-700/80">
+                                <strong class="text-cyan-300">7. Jarak</strong> – <span class="text-amber-300 font-semibold">dekat, hampir</span>
+                            </li>
+                            <li class="px-2.5 py-1.5 rounded-lg bg-slate-950/85 border border-slate-700/80">
+                                <strong class="text-cyan-300">8. Waktu</strong> – <span class="text-amber-300 font-semibold">malam, petang</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="mt-3 p-2.5 rounded-xl bg-blue-950/80 border border-cyan-400/40 text-[11px] sm:text-xs text-cyan-200 text-center">
+                        ☝️ Halakan <strong>kursor jari telunjuk</strong> ke butang di bawah & buat <strong>gerakan cubitan (pinch)</strong> untuk membuka kunci Misi 1!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Butang Wajib (Hanya boleh diaktifkan melalui kursor jari telunjuk maya + gerakan cubitan) -->
+            <div class="text-center">
+                <button id="btn-unlock-mission1" data-action="unlock-mission-1" data-pinch-only="true" class="virtual-btn w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-green-400 via-cyan-400 to-blue-600 text-slate-950 font-tech font-black text-base md:text-lg tracking-wider border-2 border-white shadow-[0_0_28px_rgba(34,211,238,0.85)]">
+                    ✅ SAYA SUDAH FAHAM — MULA MISI
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. SKRIN PERSEDIAAN KAMERA -->
+    <section id="screen-camera" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+        <div class="holo-panel rounded-3xl max-w-xl w-full p-6 md:p-8 text-center border-2 border-cyan-400">
+            <span class="px-3 py-1 rounded-full bg-cyan-950 border border-cyan-400 text-cyan-300 font-tech text-xs font-bold tracking-widest">
+                PENYELARASAN SENSOR M.A.T.A.
+            </span>
+            <h2 class="font-tech text-2xl md:text-3xl font-black text-white mt-3">PERSEDIAAN KAMERA & SENSOR</h2>
+            <p class="text-slate-300 text-xs md:text-sm mt-2 mb-5">
+                “Pastikan wajah, tangan dan badan kamu berada dalam kawasan kamera yang kelihatan.”
+            </p>
+
+            <div class="bg-slate-900/90 rounded-2xl p-4 border border-cyan-500/30 text-left space-y-3 text-sm mb-5">
+                <div id="status-cam" class="flex items-center gap-3">
+                    <span class="animate-spin">⏳</span> <span class="text-slate-300">Kamera sedang disediakan...</span>
+                </div>
+                <div id="status-hand" class="flex items-center gap-3">
+                    <span class="animate-pulse">🖐️</span> <span class="text-slate-300">Mengesan tangan (Hand Landmarker)...</span>
+                </div>
+                <div id="status-pose" class="flex items-center gap-3">
+                    <span class="animate-pulse">🧍</span> <span class="text-slate-300">Mengesan gerakan badan (Pose Landmarker)...</span>
+                </div>
+                <div id="status-ready" class="flex items-center gap-3 pt-2 border-t border-slate-800 font-bold text-amber-400">
+                    <span>⚡</span> <span>Menunggu pengesahan sistem...</span>
+                </div>
+            </div>
+
+            <div id="camera-error-box" class="hidden mb-4 p-3 rounded-xl bg-red-950/80 border border-red-500 text-xs text-red-200">
+                Kamera tidak dapat diakses. Anda masih boleh menguji permainan dengan mengaktifkan <strong>Mod Tetikus: ON</strong> di penjuru kanan atas.
+            </div>
+
+            <button id="btn-launch-game" data-action="to-notes" disabled class="virtual-btn w-full py-4 rounded-2xl bg-slate-700 text-slate-400 font-tech font-black text-base tracking-wider border-2 border-slate-600 cursor-not-allowed transition-all">
+                MENUNGGU SENSOR...
+            </button>
+        </div>
+    </section>
+
+    <!-- 4. PANEL SOALAN KATA ADJEKTIF (MISI 1 & MISI 2) -->
+    <section id="screen-question" class="fixed inset-0 z-40 hidden items-center justify-center p-3 md:p-6 bg-slate-950/60 backdrop-blur-[2px]">
+        <div class="holo-panel rounded-3xl max-w-3xl w-full p-5 md:p-7 border-2 border-amber-400 shadow-[0_0_40px_rgba(251,191,36,0.35)]">
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-cyan-500/30">
+                <div class="flex items-center gap-2">
+                    <span id="q-mission-badge" class="px-3 py-1 rounded-lg bg-red-600 text-white font-tech text-xs font-bold">MISI 1</span>
+                    <span id="q-category-badge" class="px-3 py-1 rounded-lg bg-cyan-950 border border-cyan-400 text-cyan-300 text-xs font-bold">Kata Adjektif</span>
+                </div>
+                <span id="q-number-badge" class="font-tech text-sm text-amber-400 font-bold">SOALAN 1 / 5</span>
+            </div>
+
+            <div class="my-4 bg-slate-900/90 p-4 rounded-2xl border border-cyan-500/30">
+                <p id="q-sentence" class="text-lg md:text-2xl font-bold text-white leading-snug">Soalan di sini...</p>
+            </div>
+
+            <!-- Pilihan Jawapan A, B, C, D -->
+            <div id="q-options-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4"></div>
+
+            <!-- Arahan Gerakan & Pengesan Masa Nyata -->
+            <div id="q-gesture-box" class="bg-blue-950/90 border border-cyan-400/60 rounded-2xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="text-xs md:text-sm text-cyan-100">
+                    <div class="font-tech text-amber-400 font-bold mb-1" id="q-gesture-title">🖐️ ARAHAN GERAKAN TANGAN:</div>
+                    <div id="q-gesture-desc">Tunjukkan bilangan jari ke kamera!</div>
+                </div>
+                <!-- Bar Penahanan Jawapan (Hold Meter 1.5 saat) -->
+                <div class="w-full sm:w-48 bg-slate-950 p-2.5 rounded-xl border border-cyan-500/40 text-center shrink-0">
+                    <div class="text-[11px] text-slate-300 mb-1">Dikesan: <strong id="detected-gesture-label" class="text-amber-400">Tiada</strong></div>
+                    <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="gesture-hold-bar" class="h-full bg-gradient-to-r from-cyan-400 to-green-400 transition-all duration-75" style="width: 0%"></div>
+                    </div>
+                    <div class="text-[10px] text-cyan-300 mt-1">Kekalkan isyarat 1.5 saat</div>
+                </div>
+            </div>
+
+            <!-- Panel Maklum Balas Selepas Jawapan Diproses -->
+            <div id="q-feedback-box" class="hidden mt-4 p-4 rounded-2xl border-2 text-center">
+                <h3 id="q-feedback-title" class="font-tech text-lg md:text-2xl font-black mb-1">JAWAPAN TEPAT! +10 MARKAH</h3>
+                <p id="q-feedback-explanation" class="text-sm md:text-base text-slate-100 mb-4">Penerangan ringkas.</p>
+                <button data-action="continue-mission" class="virtual-btn px-8 py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 font-tech font-black text-sm md:text-base border-2 border-white shadow-lg cursor-pointer">
+                    SAMBUNG MISI ➔
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. SKRIN PERALIHAN ANTARA MISI -->
+    <section id="screen-transition" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+        <div class="holo-panel rounded-3xl max-w-xl w-full p-6 md:p-8 text-center border-2 border-red-500">
+            <span class="px-3 py-1 rounded-full bg-red-600 text-white font-tech text-xs font-bold tracking-widest">KEMAS KINI PROTOKOL M.A.T.A.</span>
+            <h2 id="trans-title" class="font-tech text-2xl md:text-3xl font-black text-amber-400 mt-3">MISI 2: OPERASI ISYARAT TANGAN</h2>
+            <p id="trans-desc" class="text-slate-200 text-sm md:text-base my-4 leading-relaxed"></p>
+            <div id="trans-extra" class="bg-slate-900/90 p-3.5 rounded-2xl border border-cyan-500/30 text-xs md:text-sm text-cyan-200 mb-6 text-left space-y-1.5"></div>
+            <button data-action="dismiss-transition" class="virtual-btn w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-red-600 text-slate-950 font-tech font-black text-base tracking-wider border-2 border-white shadow-lg cursor-pointer">
+                TERUSKAN MISI ➔
+            </button>
+        </div>
+    </section>
+
+    <!-- 6. SKRIN AKHIR ("MISI BERJAYA!") -->
+    <section id="screen-results" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+        <div class="holo-panel rounded-3xl max-w-2xl w-full p-6 md:p-8 text-center border-2 border-amber-400 max-h-[94vh] overflow-y-auto">
+            <div class="inline-block px-4 py-1 rounded-full bg-green-500/20 border border-green-400 text-green-300 font-tech text-xs font-bold mb-2">
+                SEMUA OBJEKTIF TERAS SELESAI
+            </div>
+            <h2 class="font-tech text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-white to-amber-400">
+                MISI BERJAYA!
+            </h2>
+            
+            <div class="my-4 p-4 rounded-2xl bg-gradient-to-r from-blue-950 via-slate-900 to-blue-950 border border-amber-400/60">
+                <div class="text-xs font-tech text-cyan-300 uppercase">Jumlah Markah Keseluruhan</div>
+                <div id="res-total-score" class="font-tech text-4xl md:text-5xl font-black text-amber-400 my-1">0</div>
+                <div id="res-badge" class="inline-block mt-1 px-4 py-1 rounded-full bg-amber-400 text-slate-950 font-tech font-black text-xs md:text-sm">
+                    EJEN UTAMA M.A.T.A.
+                </div>
+                <p id="res-message" class="text-xs md:text-sm text-slate-200 mt-2">Tahniah ejen muda! Kamu telah menguasai Kata Adjektif dengan cemerlang!</p>
+            </div>
+
+            <!-- Statistik Terperinci -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs md:text-sm mb-6">
+                <div class="bg-slate-900/90 p-3 rounded-xl border border-cyan-500/30">
+                    <div class="text-slate-400">Jumlah Padanan</div>
+                    <div id="res-total-matches" class="font-tech text-lg font-bold text-cyan-300">0</div>
+                </div>
+                <div class="bg-slate-900/90 p-3 rounded-xl border border-cyan-500/30">
+                    <div class="text-slate-400">Jumlah Kombo</div>
+                    <div id="res-total-combos" class="font-tech text-lg font-bold text-red-400">0</div>
+                </div>
+                <div class="bg-slate-900/90 p-3 rounded-xl border border-green-500/30">
+                    <div class="text-slate-400">Soalan Betul</div>
+                    <div id="res-correct" class="font-tech text-lg font-bold text-green-400">0 / 10</div>
+                </div>
+                <div class="bg-slate-900/90 p-3 rounded-xl border border-amber-500/30 col-span-2 sm:col-span-3">
+                    <div class="text-slate-400">Cabaran I.R.I.S. Kata Adjektif</div>
+                    <div id="res-iris-status" class="font-tech text-base md:text-lg font-bold text-amber-300">5/5 I.R.I.S berjaya dipilih</div>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                <button data-action="restart-game" class="virtual-btn flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 font-tech font-black text-sm md:text-base border-2 border-white shadow-lg cursor-pointer">
+                    🔄 MAIN SEMULA
+                </button>
+                <button data-action="end-mission" class="virtual-btn flex-1 py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 text-cyan-300 font-tech font-bold text-sm md:text-base border border-cyan-500/50 cursor-pointer">
+                    🏁 TAMAT MISI
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        /**
+         * ============================================================================
+         * PANGKALAN DATA SOALAN TEPAT SPESIFIKASI V2
+         * Misi 1: 5 Soalan (Jawapan Bilangan Jari: 1, 2, 3, 4)
+         * Misi 2: 5 Soalan (Jawapan Gerakan Tangan: Dua Tangan, Penumbuk, Lima ✋, Maaf 🙏)
+         * ============================================================================
+         */
+        const QUESTIONS_V2 = [
+            // --- MISI 1 (5 SOALAN) ---
+            {
+                mission: 1,
+                category: "Kata Adjektif Sifatan",
+                sentence: "1. Ali seorang murid yang ______ kerana sentiasa membantu rakannya.",
+                options: ["malas", "rajin", "kasar", "degil"],
+                correct: 1, // B. rajin
+                explanation: "‘Rajin’ ialah kata adjektif sifatan yang menunjukkan sikap suka berusaha dan membantu."
+            },
+            {
+                mission: 1,
+                category: "Kata Adjektif Warna",
+                sentence: "2. Baju yang dipakai oleh Siti berwarna ______.",
+                options: ["tinggi", "manis", "merah", "jauh"],
+                correct: 2, // C. merah
+                explanation: "‘Merah’ ialah kata adjektif warna yang menerangkan warna baju."
+            },
+            {
+                mission: 1,
+                category: "Kata Adjektif Ukuran",
+                sentence: "3. Pokok kelapa itu sangat ______.",
+                options: ["tinggi", "masam", "merah", "pantas"],
+                correct: 0, // A. tinggi
+                explanation: "‘Tinggi’ ialah kata adjektif ukuran yang menerangkan ketinggian pokok."
+            },
+            {
+                mission: 1,
+                category: "Kata Adjektif Bentuk",
+                sentence: "4. Bola itu berbentuk ______.",
+                options: ["panjang", "bulat", "pahit", "lembut"],
+                correct: 1, // B. bulat
+                explanation: "‘Bulat’ ialah kata adjektif bentuk yang menerangkan rupa bentuk bola."
+            },
+            {
+                mission: 1,
+                category: "Kata Adjektif Perasaan",
+                sentence: "5. Amin berasa ______ apabila mendapat hadiah daripada ibunya.",
+                options: ["sedih", "marah", "gembira", "takut"],
+                correct: 2, // C. gembira
+                explanation: "‘Gembira’ ialah kata adjektif perasaan yang menunjukkan rasa suka hati."
+            },
+
+            // --- MISI 2 (5 SOALAN) ---
+            {
+                mission: 2,
+                category: "Kata Adjektif Pancaindera",
+                sentence: "1. Kek yang dibuat oleh ibu sangat ______.",
+                options: ["lazat", "tinggi", "luas", "jauh"],
+                correct: 0, // A. lazat
+                explanation: "‘Lazat’ ialah kata adjektif pancaindera (deria rasa) yang bermaksud sedap."
+            },
+            {
+                mission: 2,
+                category: "Kata Adjektif Jarak",
+                sentence: "2. Rumah nenek tidak ______ dari sekolah saya.",
+                options: ["manis", "jauh", "bulat", "merah"],
+                correct: 1, // B. jauh
+                explanation: "‘Jauh’ ialah kata adjektif jarak yang menerangkan ruang antara rumah dan sekolah."
+            },
+            {
+                mission: 2,
+                category: "Kata Adjektif Cara",
+                sentence: "3. Adik berjalan dengan ______ kerana jalan itu licin.",
+                options: ["laju", "perlahan", "masam", "cantik"],
+                correct: 1, // B. perlahan
+                explanation: "‘Perlahan’ ialah kata adjektif cara yang menerangkan kelakuan berjalan dengan berhati-hati."
+            },
+            {
+                mission: 2,
+                category: "Kata Adjektif Waktu",
+                sentence: "4. Kami pergi ke sekolah pada waktu ______.",
+                options: ["pagi", "bulat", "keras", "tinggi"],
+                correct: 0, // A. pagi
+                explanation: "‘Pagi’ ialah kata adjektif waktu yang menerangkan tempoh masa."
+            },
+            {
+                mission: 2,
+                category: "Kata Adjektif Pancaindera / Keadaan",
+                sentence: "5. Air sungai itu sangat ______ selepas hujan turun dengan lebat.",
+                options: ["keruh", "manis", "rendah", "merah"],
+                correct: 0, // A. keruh
+                explanation: "‘Keruh’ menerangkan keadaan air sungai yang tidak jernih akibat hujan lebat."
+            }
+        ];
+
+        // Senarai Perkataan Misi 3 (I.R.I.S. Jatuh)
+        const IRIS_CORRECT_WORDS = ["kecil", "tinggi", "sedih", "marah", "kecewa"];
+        const IRIS_DISTRACTOR_WORDS = ["makan", "tidur", "berlari", "bersukan", "membaca", "saya", "Nazri", "kawan"];
+
+        /**
+         * ============================================================================
+         * 6 JENIS OBJEK TENAGA DIGITAL BERTEMAKAN EJEN ALI (SVG ASLI)
+         * ============================================================================
+         */
+        const ENERGY_ITEMS = [
+            {
+                id: 0,
+                name: "Teras I.R.I.S.",
+                color: "from-cyan-500/35 to-blue-600/35 border-cyan-400",
+                svg: `<svg viewBox="0 0 48 48" class="w-8 h-8 md:w-10 md:h-10 drop-shadow-[0_0_8px_#22d3ee]"><polygon points="24,4 42,14 42,34 24,44 6,34 6,14" fill="#0891b2" stroke="#67e8f9" stroke-width="2.5"/><circle cx="24" cy="24" r="7" fill="#ffffff"/><circle cx="24" cy="24" r="3" fill="#0284c7"/></svg>`
+            },
+            {
+                id: 1,
+                name: "Kapsul Tekno",
+                color: "from-red-500/35 to-rose-700/35 border-red-400",
+                svg: `<svg viewBox="0 0 48 48" class="w-8 h-8 md:w-10 md:h-10 drop-shadow-[0_0_8px_#f87171]"><rect x="14" y="6" width="20" height="36" rx="10" fill="#dc2626" stroke="#fca5a5" stroke-width="2.5"/><line x1="14" y1="24" x2="34" y2="24" stroke="#ffffff" stroke-width="3"/><circle cx="24" cy="15" r="3" fill="#fef08a"/></svg>`
+            },
+            {
+                id: 2,
+                name: "Kristal Neuro",
+                color: "from-amber-400/35 to-yellow-600/35 border-amber-400",
+                svg: `<svg viewBox="0 0 48 48" class="w-8 h-8 md:w-10 md:h-10 drop-shadow-[0_0_8px_#fbbf24]"><polygon points="24,3 38,24 24,45 10,24" fill="#d97706" stroke="#fde047" stroke-width="2.5"/><polygon points="24,11 31,24 24,37 17,24" fill="#fef08a"/></svg>`
+            },
+            {
+                id: 3,
+                name: "Cip Inviso",
+                color: "from-purple-500/35 to-indigo-700/35 border-purple-400",
+                svg: `<svg viewBox="0 0 48 48" class="w-8 h-8 md:w-10 md:h-10 drop-shadow-[0_0_8px_#c084fc]"><rect x="11" y="11" width="26" height="26" rx="4" fill="#7e22ce" stroke="#e9d5ff" stroke-width="2.5"/><rect x="17" y="17" width="14" height="14" fill="#c084fc"/><path d="M18 6v5M30 6v5M18 37v5M30 37v5M6 18h5M6 30h5M37 18h5M37 30h5" stroke="#e9d5ff" stroke-width="2.5"/></svg>`
+            },
+            {
+                id: 4,
+                name: "Perisai Kombat",
+                color: "from-emerald-500/35 to-green-700/35 border-emerald-400",
+                svg: `<svg viewBox="0 0 48 48" class="w-8 h-8 md:w-10 md:h-10 drop-shadow-[0_0_8px_#34d399]"><path d="M24 5 L40 12 V24 C40 34 32 41 24 44 C16 41 8 34 8 24 V12 Z" fill="#059669" stroke="#6ee7b7" stroke-width="2.5"/><path d="M24 13 V35 M15 22 H33" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/></svg>`
+            },
+            {
+                id: 5,
+                name: "Modul Satelit",
+                color: "from-pink-500/35 to-fuchsia-700/35 border-pink-400",
+                svg: `<svg viewBox="0 0 48 48" class="w-8 h-8 md:w-10 md:h-10 drop-shadow-[0_0_8px_#f472b6]"><circle cx="24" cy="24" r="14" fill="#db2777" stroke="#f9a8d4" stroke-width="2.5"/><ellipse cx="24" cy="24" rx="20" ry="7" fill="none" stroke="#ffffff" stroke-width="2" transform="rotate(-25 24 24)"/><circle cx="24" cy="24" r="4" fill="#ffffff"/></svg>`
+            }
+        ];
+
+        /**
+         * ============================================================================
+         * SINTESIS AUDIO (TONE.JS)
+         * ============================================================================
+         */
+        const SoundFX = {
+            initialized: false,
+            synth: null,
+            init() {
+                if (this.initialized) return;
+                try {
+                    this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    this.synth.volume.value = -8;
+                    this.initialized = true;
+                } catch (e) {
+                    console.warn("Audio tidak tersedia:", e);
+                }
+            },
+            playPinch() {
+                if (!this.initialized) this.init();
+                if (this.synth) this.synth.triggerAttackRelease("C6", "32n");
+            },
+            playMatch(combo = 1) {
+                if (!this.initialized) this.init();
+                if (!this.synth) return;
+                const notes = ["C5", "E5", "G5", "B5", "C6"];
+                const baseNote = notes[Math.min(combo - 1, notes.length - 1)];
+                this.synth.triggerAttackRelease([baseNote, "G5"], "16n");
+            },
+            playCorrect() {
+                if (!this.initialized) this.init();
+                if (!this.synth) return;
+                const now = Tone.now();
+                this.synth.triggerAttackRelease("E5", "16n", now);
+                this.synth.triggerAttackRelease("G5", "16n", now + 0.1);
+                this.synth.triggerAttackRelease("C6", "8n", now + 0.2);
+            },
+            playWrong() {
+                if (!this.initialized) this.init();
+                if (!this.synth) return;
+                const now = Tone.now();
+                this.synth.triggerAttackRelease("Eb4", "16n", now);
+                this.synth.triggerAttackRelease("C4", "8n", now + 0.15);
+            }
+        };
+
+        /**
+         * ============================================================================
+         * KEADAAN UTAMA PERMAINAN (GAME STATE V2)
+         * ============================================================================
+         */
+        const GRID_SIZE = 7;
+        const state = {
+            screen: 'intro', // intro, camera, notes, playing, question, transition, iris_fall, results
+            notesConfirmed: false, // Kunci wajib Misi 1 sehingga murid cubit butang "SAYA SUDAH FAHAM — MULA MISI"
+            board: [],
+            selectedCell: null,
+            isProcessingBoard: false,
+
+            // Pemarkahan & Statistik
+            totalScore: 0,
+            totalMatchesCount: 0,
+            combo: 0,
+            totalCombosCount: 0,
+            correctAnswers: 0,
+            wrongAnswers: 0,
+
+            // Kemajuan Misi
+            currentMission: 1, // 1, 2, atau 3
+            questionIndex: 0, // 0..4 (Misi 1), 5..9 (Misi 2)
+            matchesSinceLastQuestion: 0,
+            matchesNeededForQuestion: 2, // 2 padanan untuk mencetuskan soalan supaya murid cepat berinteraksi
+
+            // Misi 3: I.R.I.S. Jatuh
+            collectedIrisWords: new Set(),
+            fallingIrisList: [],
+            irisSpawnTimer: 0,
+            irisAnimFrameId: null,
+            lastIrisFrameTime: 0,
+
+            // Kawalan Kursor & Cubitan (1 cubitan = 1 tindakan)
+            cursorX: window.innerWidth / 2,
+            cursorY: window.innerHeight / 2,
+            pinchLocked: false,
+            mouseFallback: false,
+
+            // Pengecaman Jawapan Soalan (1.5 saat)
+            currentDetectedGesture: null,
+            gestureHoldStart: 0,
+            gestureHoldDuration: 1500,
+            questionAnswered: false
+        };
+
+        /**
+         * ============================================================================
+         * PENGURUSAN PAPARAN SKRIN & NAVIGASI
+         * ============================================================================
+         */
+        function showScreen(screenName) {
+            state.screen = screenName;
+            const modalScreens = ['screen-intro', 'screen-notes', 'screen-camera', 'screen-question', 'screen-transition', 'screen-results'];
+            modalScreens.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.classList.add('hidden');
+                    el.classList.remove('flex');
+                }
+            });
+
+            const hud = document.getElementById('game-hud');
+            const board = document.getElementById('board-container');
+            const irisFall = document.getElementById('iris-fall-container');
+
+            hud.classList.add('hidden');
+            hud.classList.remove('flex');
+            board.classList.add('hidden');
+            board.classList.remove('flex');
+            irisFall.classList.add('hidden');
+
+            if (screenName === 'playing') {
+                hud.classList.remove('hidden');
+                hud.classList.add('flex');
+                board.classList.remove('hidden');
+                board.classList.add('flex');
+            } else if (screenName === 'question') {
+                hud.classList.remove('hidden');
+                hud.classList.add('flex');
+                board.classList.remove('hidden');
+                board.classList.add('flex');
+                const qEl = document.getElementById('screen-question');
+                qEl.classList.remove('hidden');
+                qEl.classList.add('flex');
+            } else if (screenName === 'iris_fall') {
+                hud.classList.remove('hidden');
+                hud.classList.add('flex');
+                irisFall.classList.remove('hidden');
+            } else {
+                const target = document.getElementById(`screen-${screenName}`);
+                if (target) {
+                    target.classList.remove('hidden');
+                    target.classList.add('flex');
+                }
+            }
+        }
+
+        function handleAction(action) {
+            SoundFX.playPinch();
+            switch (action) {
+                case 'to-camera-setup':
+                    showScreen('camera');
+                    initCameraAndMediaPipe();
+                    break;
+                case 'to-notes':
+                    state.notesConfirmed = false;
+                    showScreen('notes');
+                    break;
+                case 'unlock-mission-1':
+                    // Membuka kunci Misi 1 secara rasmi selepas murid menekan butang nota
+                    state.notesConfirmed = true;
+                    resetGameVariables();
+                    initBoard();
+                    updateHUD();
+                    showScreen('playing');
+                    break;
+                case 'start-gameplay':
+                    // Kunci keselamatan: Misi 1 wajib dikunci jika nota belum disahkan
+                    if (!state.notesConfirmed) {
+                        showScreen('notes');
+                        return;
+                    }
+                    resetGameVariables();
+                    initBoard();
+                    updateHUD();
+                    showScreen('playing');
+                    break;
+                case 'continue-mission':
+                    afterQuestionContinue();
+                    break;
+                case 'dismiss-transition':
+                    if (state.currentMission === 3) {
+                        startMission3IrisFall();
+                    } else {
+                        showScreen('playing');
+                        updateHUD();
+                    }
+                    break;
+                case 'restart-game':
+                    stopMission3Loop();
+                    state.notesConfirmed = false;
+                    showScreen('notes');
+                    break;
+                case 'end-mission':
+                    stopMission3Loop();
+                    state.notesConfirmed = false;
+                    showScreen('intro');
+                    break;
+            }
+        }
+
+        function resetGameVariables() {
+            state.totalScore = 0;
+            state.totalMatchesCount = 0;
+            state.combo = 0;
+            state.totalCombosCount = 0;
+            state.correctAnswers = 0;
+            state.wrongAnswers = 0;
+            state.currentMission = 1;
+            state.questionIndex = 0;
+            state.matchesSinceLastQuestion = 0;
+            state.matchesNeededForQuestion = 2;
+            state.selectedCell = null;
+            state.isProcessingBoard = false;
+
+            // Tetapkan semula Misi 3
+            state.collectedIrisWords.clear();
+            state.fallingIrisList = [];
+            document.getElementById('iris-spawn-layer').innerHTML = '';
+            IRIS_CORRECT_WORDS.forEach(w => {
+                const badge = document.getElementById(`badge-word-${w}`);
+                if (badge) {
+                    badge.className = "px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-600 text-slate-400 font-bold text-xs md:text-sm";
+                }
+            });
+        }
+
+        /**
+         * ============================================================================
+         * LOGIK PERMAINAN PADANAN 3 (MISI 1 & MISI 2)
+         * ============================================================================
+         */
+        function initBoard() {
+            state.board = [];
+            for (let r = 0; r < GRID_SIZE; r++) {
+                const row = [];
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    let type;
+                    do {
+                        type = Math.floor(Math.random() * ENERGY_ITEMS.length);
+                    } while (
+                        (c >= 2 && row[c - 1] === type && row[c - 2] === type) ||
+                        (r >= 2 && state.board[r - 1][c] === type && state.board[r - 2][c] === type)
+                    );
+                    row.push(type);
+                }
+                state.board.push(row);
+            }
+            renderBoard();
+        }
+
+        function renderBoard(matchedCells = []) {
+            const gridEl = document.getElementById('match3-grid');
+            gridEl.innerHTML = '';
+            const matchedSet = new Set(matchedCells.map(cell => `${cell.r},${cell.c}`));
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const itemType = state.board[r][c];
+                    const item = ENERGY_ITEMS[itemType];
+                    const isSelected = state.selectedCell && state.selectedCell.r === r && state.selectedCell.c === c;
+                    const isMatched = matchedSet.has(`${r},${c}`);
+
+                    const cellBtn = document.createElement('div');
+                    cellBtn.dataset.r = r;
+                    cellBtn.dataset.c = c;
+                    cellBtn.className = `match-cell relative rounded-xl md:rounded-2xl bg-gradient-to-br ${item ? item.color : 'from-slate-800 to-slate-900'} border flex items-center justify-center cursor-pointer transition-all duration-150 ${
+                        isSelected ? 'ring-4 ring-white scale-110 z-10 shadow-[0_0_20px_#fff]' : 'hover:scale-105'
+                    } ${isMatched ? 'scale-0 opacity-0 bg-white' : 'scale-100 opacity-100'}`;
+
+                    if (item) {
+                        cellBtn.innerHTML = item.svg;
+                    }
+
+                    cellBtn.addEventListener('click', () => handleCellSelect(r, c));
+                    gridEl.appendChild(cellBtn);
+                }
+            }
+        }
+
+        async function handleCellSelect(r, c) {
+            if (state.screen !== 'playing' || state.isProcessingBoard) return;
+            SoundFX.playPinch();
+
+            if (!state.selectedCell) {
+                state.selectedCell = { r, c };
+                renderBoard();
+                return;
+            }
+
+            const prev = state.selectedCell;
+            if (prev.r === r && prev.c === c) {
+                state.selectedCell = null;
+                renderBoard();
+                return;
+            }
+
+            const isAdjacent = Math.abs(prev.r - r) + Math.abs(prev.c - c) === 1;
+            if (!isAdjacent) {
+                state.selectedCell = { r, c };
+                renderBoard();
+                return;
+            }
+
+            state.selectedCell = null;
+            await attemptSwap(prev.r, prev.c, r, c);
+        }
+
+        async function attemptSwap(r1, c1, r2, c2) {
+            state.isProcessingBoard = true;
+
+            const temp = state.board[r1][c1];
+            state.board[r1][c1] = state.board[r2][c2];
+            state.board[r2][c2] = temp;
+            renderBoard();
+
+            await sleep(180);
+
+            const matches = findMatches();
+            if (matches.length === 0) {
+                const revert = state.board[r1][c1];
+                state.board[r1][c1] = state.board[r2][c2];
+                state.board[r2][c2] = revert;
+                state.combo = 0;
+                updateHUD();
+                renderBoard();
+                state.isProcessingBoard = false;
+                return;
+            }
+
+            state.combo = 0;
+            await processMatchesCascade(matches);
+            state.isProcessingBoard = false;
+
+            if (state.matchesSinceLastQuestion >= state.matchesNeededForQuestion) {
+                state.matchesSinceLastQuestion = 0;
+                triggerQuestionModal();
+            }
+        }
+
+        function findMatches() {
+            const matchedMap = new Map();
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                let c = 0;
+                while (c < GRID_SIZE - 2) {
+                    const type = state.board[r][c];
+                    let len = 1;
+                    while (c + len < GRID_SIZE && state.board[r][c + len] === type) len++;
+                    if (len >= 3) {
+                        for (let k = 0; k < len; k++) {
+                            matchedMap.set(`${r},${c + k}`, { r, c: c + k, runLen: len });
+                        }
+                    }
+                    c += len;
+                }
+            }
+
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let r = 0;
+                while (r < GRID_SIZE - 2) {
+                    const type = state.board[r][c];
+                    let len = 1;
+                    while (r + len < GRID_SIZE && state.board[r + len][c] === type) len++;
+                    if (len >= 3) {
+                        for (let k = 0; k < len; k++) {
+                            const key = `${r + k},${c}`;
+                            const existing = matchedMap.get(key);
+                            matchedMap.set(key, { r: r + k, c, runLen: Math.max(len, existing ? existing.runLen : 0) });
+                        }
+                    }
+                    r += len;
+                }
+            }
+
+            return Array.from(matchedMap.values());
+        }
+
+        async function processMatchesCascade(initialMatches) {
+            let matches = initialMatches;
+
+            while (matches.length > 0) {
+                state.combo++;
+                if (state.combo >= 2) state.totalCombosCount++;
+
+                const maxRun = Math.max(...matches.map(m => m.runLen));
+                let basePoints = 10;
+                if (maxRun === 4) basePoints = 20;
+                else if (maxRun >= 5) basePoints = 30;
+
+                const earnedPoints = basePoints * state.combo;
+                state.totalScore += earnedPoints;
+                state.totalMatchesCount++;
+                state.matchesSinceLastQuestion++;
+
+                SoundFX.playMatch(state.combo);
+                showFloatingText(`+${earnedPoints}${state.combo > 1 ? ` KOMBO x${state.combo}!` : ''}`, 'text-amber-300');
+                updateHUD();
+
+                renderBoard(matches);
+                await sleep(230);
+
+                matches.forEach(m => {
+                    state.board[m.r][m.c] = -1;
+                });
+
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    let emptyRow = GRID_SIZE - 1;
+                    for (let r = GRID_SIZE - 1; r >= 0; r--) {
+                        if (state.board[r][c] !== -1) {
+                            state.board[emptyRow][c] = state.board[r][c];
+                            emptyRow--;
+                        }
+                    }
+                    while (emptyRow >= 0) {
+                        state.board[emptyRow][c] = Math.floor(Math.random() * ENERGY_ITEMS.length);
+                        emptyRow--;
+                    }
+                }
+
+                renderBoard();
+                await sleep(210);
+                matches = findMatches();
+            }
+        }
+
+        function showFloatingText(text, colorClass = 'text-amber-300') {
+            const container = document.getElementById('floating-feedback');
+            const el = document.createElement('div');
+            el.className = `animate-float-up font-tech font-black text-2xl md:text-4xl ${colorClass} drop-shadow-[0_0_18px_rgba(0,0,0,0.9)] text-center px-4`;
+            el.textContent = text;
+            container.appendChild(el);
+            setTimeout(() => el.remove(), 1050);
+        }
+
+        /**
+         * ============================================================================
+         * PAPARAN SOALAN KATA ADJEKTIF (MISI 1 & MISI 2)
+         * ============================================================================
+         */
+        function triggerQuestionModal() {
+            const qData = QUESTIONS_V2[state.questionIndex];
+            if (!qData) return;
+
+            state.questionAnswered = false;
+            state.currentDetectedGesture = null;
+            state.gestureHoldStart = 0;
+
+            const qNumInMission = (state.questionIndex % 5) + 1;
+            document.getElementById('q-mission-badge').textContent = `MISI ${qData.mission}`;
+            document.getElementById('q-category-badge').textContent = qData.category;
+            document.getElementById('q-number-badge').textContent = `SOALAN ${qNumInMission} / 5`;
+            document.getElementById('q-sentence').textContent = qData.sentence;
+
+            const optionsGrid = document.getElementById('q-options-grid');
+            optionsGrid.innerHTML = '';
+            const letters = ['A', 'B', 'C', 'D'];
+            const m1Hints = ['1 Jari ☝️', '2 Jari ✌️', '3 Jari 🤟', '4 Jari 🖖'];
+            const m2Hints = ['Dua Tangan 🙌', 'Penumbuk ✊', 'Lima Jari ✋', 'Maaf 🙏'];
+
+            qData.options.forEach((opt, idx) => {
+                const hint = qData.mission === 1 ? m1Hints[idx] : m2Hints[idx];
+                const card = document.createElement('div');
+                card.id = `q-opt-${idx}`;
+                card.className = 'virtual-btn p-3.5 rounded-2xl bg-slate-900/90 border-2 border-cyan-500/40 flex items-center justify-between cursor-pointer hover:border-amber-400';
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="w-8 h-8 rounded-lg bg-cyan-500 text-slate-950 font-tech font-black flex items-center justify-center">${letters[idx]}</span>
+                        <span class="font-bold text-white text-sm md:text-base">${opt}</span>
+                    </div>
+                    <span class="text-xs px-2.5 py-1 rounded bg-slate-800 text-amber-300 font-semibold">${hint}</span>
+                `;
+                card.addEventListener('click', () => {
+                    if (!state.questionAnswered) processQuizAnswer(idx);
+                });
+                optionsGrid.appendChild(card);
+            });
+
+            const gTitle = document.getElementById('q-gesture-title');
+            const gDesc = document.getElementById('q-gesture-desc');
+            if (qData.mission === 1) {
+                gTitle.textContent = "🖐️ ARAHAN GERAKAN BILANGAN JARI (MISI 1):";
+                gDesc.innerHTML = "Tunjukkan <strong>1 Jari (A)</strong>, <strong>2 Jari (B)</strong>, <strong>3 Jari (C)</strong>, atau <strong>4 Jari (D)</strong> ke kamera!";
+            } else {
+                gTitle.textContent = "🙌 ARAHAN GERAKAN TANGAN (MISI 2):";
+                gDesc.innerHTML = "<strong>A:</strong> Angkat Dua Tangan | <strong>B:</strong> Penumbuk ✊ | <strong>C:</strong> Lima Jari ✋ | <strong>D:</strong> Maaf 🙏";
+            }
+
+            document.getElementById('q-gesture-box').classList.remove('hidden');
+            document.getElementById('q-feedback-box').classList.add('hidden');
+            document.getElementById('gesture-hold-bar').style.width = '0%';
+            document.getElementById('detected-gesture-label').textContent = 'Tiada';
+
+            showScreen('question');
+        }
+
+        function processQuizAnswer(selectedIndex) {
+            if (state.questionAnswered) return;
+            state.questionAnswered = true;
+
+            const qData = QUESTIONS_V2[state.questionIndex];
+            const isCorrect = selectedIndex === qData.correct;
+            const letters = ['A', 'B', 'C', 'D'];
+
+            const chosenEl = document.getElementById(`q-opt-${selectedIndex}`);
+            const correctEl = document.getElementById(`q-opt-${qData.correct}`);
+
+            if (correctEl) {
+                correctEl.classList.remove('border-cyan-500/40');
+                correctEl.classList.add('border-green-400', 'bg-green-950/80');
+            }
+
+            const fbBox = document.getElementById('q-feedback-box');
+            const fbTitle = document.getElementById('q-feedback-title');
+            const fbExp = document.getElementById('q-feedback-explanation');
+
+            document.getElementById('q-gesture-box').classList.add('hidden');
+            fbBox.classList.remove('hidden', 'border-green-400', 'bg-green-950/90', 'border-red-400', 'bg-red-950/90');
+
+            if (isCorrect) {
+                state.totalScore += 10;
+                state.correctAnswers++;
+                SoundFX.playCorrect();
+                fbBox.classList.add('border-green-400', 'bg-green-950/90');
+                fbTitle.className = 'font-tech text-xl md:text-2xl font-black text-green-400 mb-1';
+                fbTitle.textContent = "JAWAPAN TEPAT! +10 MARKAH";
+            } else {
+                state.wrongAnswers++;
+                SoundFX.playWrong();
+                if (chosenEl) {
+                    chosenEl.classList.remove('border-cyan-500/40');
+                    chosenEl.classList.add('border-red-500', 'bg-red-950/80');
+                }
+                fbBox.classList.add('border-red-400', 'bg-red-950/90');
+                fbTitle.className = 'font-tech text-lg md:text-2xl font-black text-red-400 mb-1';
+                fbTitle.textContent = `KURANG TEPAT! Jawapan betul ialah ${letters[qData.correct]}. ${qData.options[qData.correct]}`;
+            }
+
+            fbExp.textContent = qData.explanation;
+            state.questionIndex++;
+            updateHUD();
+        }
+
+        function afterQuestionContinue() {
+            // Tamat 5 soalan Misi 1 -> Masuk Misi 2
+            if (state.questionIndex === 5 && state.currentMission === 1) {
+                state.currentMission = 2;
+                state.matchesSinceLastQuestion = 0;
+                document.getElementById('trans-title').textContent = "MISI 2: OPERASI GERAKAN TANGAN";
+                document.getElementById('trans-desc').textContent = "Tahniah! Semua 5 soalan Misi 1 selesai. Dalam Misi 2, cara menjawab ditukar kepada 4 gerakan tangan khas!";
+                document.getElementById('trans-extra').innerHTML = `
+                    <div>🙌 <strong>A:</strong> Angkat dua tangan terbuka</div>
+                    <div>✊ <strong>B:</strong> Buat tangan bentuk penumbuk</div>
+                    <div>✋ <strong>C:</strong> Buat tangan bentuk lima (5 jari terbuka)</div>
+                    <div>🙏 <strong>D:</strong> Buat tangan bentuk maaf (rapatkan kedua tapak tangan)</div>
+                `;
+                showScreen('transition');
+            }
+            // Tamat 5 soalan Misi 2 -> Masuk Misi 3 (Permainan I.R.I.S. Jatuh)
+            else if (state.questionIndex === 10 && state.currentMission === 2) {
+                state.currentMission = 3;
+                document.getElementById('trans-title').textContent = "MISI 3: PERMAINAN I.R.I.S. JATUH";
+                document.getElementById('trans-desc').textContent = "Amaran sistem! Banyak peranti I.R.I.S. sedang jatuh dari langit Cyberaya. Gunakan kursor jari telunjuk dan cubitan untuk menangkap TEPAT 5 Kata Adjektif yang betul!";
+                document.getElementById('trans-extra').innerHTML = `
+                    <div class="text-cyan-300 font-bold">🎯 5 Kata Adjektif Sasaran: kecil, tinggi, sedih, marah, kecewa</div>
+                    <div class="text-red-300">⚠️ Elakkan perkataan pengganggu seperti makan, tidur, berlari, Nazri!</div>
+                `;
+                showScreen('transition');
+            } else {
+                showScreen('playing');
+                updateHUD();
+            }
+        }
+
+        /**
+         * ============================================================================
+         * MISI 3 — PERMAINAN I.R.I.S. JATUH
+         * ============================================================================
+         */
+        function startMission3IrisFall() {
+            showScreen('iris_fall');
+            updateHUD();
+            state.lastIrisFrameTime = performance.now();
+            state.irisSpawnTimer = 0;
+
+            // J spawning awal 3 I.R.I.S. supaya papan terus meriah
+            spawnFallingIris(true);
+            spawnFallingIris(false);
+            spawnFallingIris(true);
+
+            state.irisAnimFrameId = requestAnimationFrame(updateMission3Loop);
+        }
+
+        function stopMission3Loop() {
+            if (state.irisAnimFrameId) {
+                cancelAnimationFrame(state.irisAnimFrameId);
+                state.irisAnimFrameId = null;
+            }
+        }
+
+        function spawnFallingIris(forceCorrect = false) {
+            const remainingCorrect = IRIS_CORRECT_WORDS.filter(w => !state.collectedIrisWords.has(w));
+            if (remainingCorrect.length === 0) return;
+
+            // 50% peluang menjatuhkan kata adjektif sasaran yang belum dikumpul
+            const shouldBeCorrect = forceCorrect || Math.random() < 0.52;
+            let word = "";
+            let isCorrect = false;
+
+            if (shouldBeCorrect) {
+                word = remainingCorrect[Math.floor(Math.random() * remainingCorrect.length)];
+                isCorrect = true;
+            } else {
+                word = IRIS_DISTRACTOR_WORDS[Math.floor(Math.random() * IRIS_DISTRACTOR_WORDS.length)];
+                isCorrect = false;
+            }
+
+            // Elak posisi X bertindih rapat dengan objek terkini
+            const margin = 90;
+            const usableWidth = Math.max(200, window.innerWidth - margin * 2);
+            let x = margin + Math.random() * usableWidth;
+
+            const id = `iris-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            const speed = 75 + Math.random() * 55; // piksel per saat (kelajuan sesuai untuk murid Tahun 4)
+
+            const el = document.createElement('div');
+            el.id = id;
+            el.dataset.irisId = id;
+            el.className = "falling-iris fixed cursor-pointer flex flex-col items-center justify-center transition-transform duration-100 select-none";
+            el.style.left = `${x}px`;
+            el.style.top = `-110px`;
+            el.style.transform = "translateX(-50%)";
+
+            // Reka bentuk visual peranti I.R.I.S. Ejen Ali dengan perkataan jelas di tengah
+            el.innerHTML = `
+                <div class="relative w-32 h-24 md:w-36 md:h-28 flex items-center justify-center">
+                    <svg viewBox="0 0 140 100" class="absolute inset-0 w-full h-full drop-shadow-[0_0_15px_rgba(6,182,212,0.85)]">
+                        <polygon points="20,12 120,12 136,50 120,88 20,88 4,50" fill="rgba(8, 22, 48, 0.92)" stroke="#22d3ee" stroke-width="3.5"/>
+                        <polygon points="28,20 112,20 124,50 112,80 28,80 16,50" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="6 4"/>
+                        <circle cx="70" cy="12" r="4" fill="#fbbf24"/>
+                        <circle cx="70" cy="88" r="4" fill="#fbbf24"/>
+                    </svg>
+                    <span class="relative z-10 font-tech font-black text-base md:text-xl text-white tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
+                        ${word}
+                    </span>
+                </div>
+            `;
+
+            el.addEventListener('click', () => handleIrisTap(id));
+            document.getElementById('iris-spawn-layer').appendChild(el);
+
+            state.fallingIrisList.push({
+                id,
+                word,
+                isCorrect,
+                x,
+                y: -110,
+                speed,
+                el,
+                clicked: false
+            });
+        }
+
+        function handleIrisTap(irisId) {
+            if (state.screen !== 'iris_fall') return;
+            const idx = state.fallingIrisList.findIndex(item => item.id === irisId);
+            if (idx === -1) return;
+
+            const item = state.fallingIrisList[idx];
+            if (item.clicked) return;
+            item.clicked = true;
+
+            if (item.isCorrect && !state.collectedIrisWords.has(item.word)) {
+                // I.R.I.S. BETUL DITEKAN!
+                state.collectedIrisWords.add(item.word);
+                state.totalScore += 20;
+                SoundFX.playCorrect();
+
+                // Kesan letupan cahaya pada I.R.I.S.
+                item.el.classList.add('iris-burst');
+                setTimeout(() => item.el.remove(), 340);
+
+                // Tandakan lencana perkataan di bawah skrin sebagai hijau bercahaya
+                const badge = document.getElementById(`badge-word-${item.word}`);
+                if (badge) {
+                    badge.className = "px-2.5 py-1 rounded-lg bg-green-500/30 border-2 border-green-400 text-green-300 font-bold text-xs md:text-sm shadow-[0_0_12px_#4ade80]";
+                    badge.textContent = `✓ ${item.word}`;
+                }
+
+                showFloatingText(`BETUL! KATA ADJEKTIF (${state.collectedIrisWords.size}/5)`, 'text-green-400');
+                updateHUD();
+
+                // Semak jika kesemua 5/5 kata adjektif telah berjaya ditekan
+                if (state.collectedIrisWords.size >= 5) {
+                    setTimeout(() => {
+                        stopMission3Loop();
+                        showFinalResults();
+                    }, 900);
+                }
+            } else {
+                // I.R.I.S. SALAH / PENGGANGGU DITEKAN
+                SoundFX.playWrong();
+                item.el.style.filter = "drop-shadow(0 0 20px #ef4444)";
+                setTimeout(() => item.el.remove(), 220);
+                showFloatingText("BUKAN KATA ADJEKTIF!", 'text-red-400');
+            }
+
+            state.fallingIrisList.splice(idx, 1);
+        }
+
+        function updateMission3Loop(now) {
+            if (state.screen !== 'iris_fall') return;
+
+            const dt = (now - state.lastIrisFrameTime) / 1000;
+            state.lastIrisFrameTime = now;
+
+            state.irisSpawnTimer += dt;
+            if (state.irisSpawnTimer >= 1.35 && state.fallingIrisList.length < 7) {
+                state.irisSpawnTimer = 0;
+                spawnFallingIris(false);
+            }
+
+            for (let i = state.fallingIrisList.length - 1; i >= 0; i--) {
+                const item = state.fallingIrisList[i];
+                item.y += item.speed * dt;
+                item.el.style.top = `${item.y}px`;
+
+                // Jika terlepas melepasi bahagian bawah skrin, buang dan jana baharu nanti
+                if (item.y > window.innerHeight + 60) {
+                    item.el.remove();
+                    state.fallingIrisList.splice(i, 1);
+                }
+            }
+
+            state.irisAnimFrameId = requestAnimationFrame(updateMission3Loop);
+        }
+
+        /**
+         * ============================================================================
+         * KEMAS KINI HUD & SKRIN KEPUTUSAN AKHIR
+         * ============================================================================
+         */
+        function updateHUD() {
+            document.getElementById('hud-score').textContent = state.totalScore;
+
+            const comboBadge = document.getElementById('hud-combo-badge');
+            if (state.combo >= 2) {
+                comboBadge.textContent = `KOMBO x${state.combo}!`;
+                comboBadge.classList.remove('opacity-0');
+            } else {
+                comboBadge.classList.add('opacity-0');
+            }
+
+            const titleEl = document.getElementById('hud-mission-title');
+            const progLabel = document.getElementById('hud-progress-label');
+            const progText = document.getElementById('hud-progress-text');
+            const progBar = document.getElementById('hud-progress-bar');
+            const subStatus = document.getElementById('hud-sub-status');
+            const ctrlBadge = document.getElementById('hud-control-badge');
+
+            if (state.currentMission === 1) {
+                titleEl.textContent = "MISI 1: PADANAN TENAGA";
+                progLabel.textContent = "Sasaran Padanan ke Soalan";
+                progText.textContent = `${state.matchesSinceLastQuestion} / ${state.matchesNeededForQuestion}`;
+                progBar.style.width = `${(state.matchesSinceLastQuestion / state.matchesNeededForQuestion) * 100}%`;
+                subStatus.innerHTML = `Soalan Misi 1: <strong class="text-white">${state.questionIndex} / 5</strong>`;
+                ctrlBadge.textContent = "Jawapan: Bil. Jari";
+            } else if (state.currentMission === 2) {
+                titleEl.textContent = "MISI 2: OPERASI ISYARAT";
+                progLabel.textContent = "Sasaran Padanan ke Soalan";
+                progText.textContent = `${state.matchesSinceLastQuestion} / ${state.matchesNeededForQuestion}`;
+                progBar.style.width = `${(state.matchesSinceLastQuestion / state.matchesNeededForQuestion) * 100}%`;
+                subStatus.innerHTML = `Soalan Misi 2: <strong class="text-white">${state.questionIndex - 5} / 5</strong>`;
+                ctrlBadge.textContent = "Jawapan: Gerakan Tangan";
+            } else {
+                const count = state.collectedIrisWords.size;
+                titleEl.textContent = "MISI 3: I.R.I.S. JATUH";
+                progLabel.textContent = "Kata Adjektif Ditekan";
+                progText.textContent = `${count} / 5`;
+                progBar.style.width = `${(count / 5) * 100}%`;
+                subStatus.innerHTML = `Kemajuan I.R.I.S.: <strong class="text-amber-400">${count}/5</strong>`;
+                ctrlBadge.textContent = "Kawalan: Cubit I.R.I.S.";
+            }
+        }
+
+        function showFinalResults() {
+            SoundFX.playCorrect();
+            document.getElementById('res-total-score').textContent = state.totalScore;
+            document.getElementById('res-total-matches').textContent = state.totalMatchesCount;
+            document.getElementById('res-total-combos').textContent = state.totalCombosCount;
+            document.getElementById('res-correct').textContent = `${state.correctAnswers} / 10`;
+            document.getElementById('res-iris-status').textContent = `${state.collectedIrisWords.size}/5 I.R.I.S berjaya dipilih`;
+
+            let badge = "EJEN BAHASA MUDA";
+            if (state.totalScore >= 220) badge = "EJEN UTAMA M.A.T.A.";
+            else if (state.totalScore >= 150) badge = "EJEN PAKAR KATA ADJEKTIF";
+
+            document.getElementById('res-badge').textContent = badge;
+            showScreen('results');
+        }
+
+        /**
+         * ============================================================================
+         * INTEGRASI MEDIAPIPE HAND LANDMARKER (2 TANGAN) & POSE LANDMARKER
+         * ============================================================================
+         */
+        let handLandmarker = null;
+        let poseLandmarker = null;
+        let videoEl = null;
+        let canvasEl = null;
+        let canvasCtx = null;
+        let lastVideoTime = -1;
+        let detectionLoopStarted = false;
+
+        async function initCameraAndMediaPipe() {
+            const statusCam = document.getElementById('status-cam');
+            const statusHand = document.getElementById('status-hand');
+            const statusPose = document.getElementById('status-pose');
+            const statusReady = document.getElementById('status-ready');
+            const launchBtn = document.getElementById('btn-launch-game');
+
+            videoEl = document.getElementById('webcam');
+            canvasEl = document.getElementById('skeleton-canvas');
+            canvasCtx = canvasEl.getContext('2d');
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+                    audio: false
+                });
+                videoEl.srcObject = stream;
+                await new Promise(resolve => {
+                    videoEl.onloadedmetadata = () => {
+                        videoEl.play();
+                        resolve();
+                    };
+                });
+
+                statusCam.innerHTML = `<span class="text-green-400">✅</span> <span class="text-green-300">Kamera aktif dan bersedia!</span>`;
+
+                let retries = 0;
+                while (!window.mediaPipeLoaded && retries < 30) {
+                    await sleep(200);
+                    retries++;
+                }
+
+                const vision = await window.FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+                );
+
+                // PENTING: numHands: 2 untuk menyokong isyarat dua tangan, penumbuk, lima jari & maaf 🙏
+                handLandmarker = await window.HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 2
+                });
+                statusHand.innerHTML = `<span class="text-green-400">✅</span> <span class="text-green-300">Pengesan 2 Tangan & Isyarat aktif!</span>`;
+
+                poseLandmarker = await window.PoseLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numPoses: 1
+                });
+                statusPose.innerHTML = `<span class="text-green-400">✅</span> <span class="text-green-300">Pengesan Posisi Badan aktif!</span>`;
+
+                statusReady.innerHTML = `<span class="text-cyan-400">🚀</span> <span class="text-cyan-300">Sistem sensor sedia! Teruskan ke Nota Pembelajaran...</span>`;
+                launchBtn.disabled = false;
+                launchBtn.className = "virtual-btn w-full py-4 rounded-2xl bg-gradient-to-r from-green-400 to-cyan-500 text-slate-950 font-tech font-black text-base tracking-wider border-2 border-white shadow-[0_0_25px_rgba(52,211,153,0.7)] cursor-pointer";
+                launchBtn.textContent = "BUKA NOTA KATA ADJEKTIF ➔";
+
+                if (!detectionLoopStarted) {
+                    detectionLoopStarted = true;
+                    requestAnimationFrame(predictWebcamLoop);
+                }
+
+            } catch (err) {
+                console.error("Ralat Kamera/MediaPipe:", err);
+                const errBox = document.getElementById('camera-error-box');
+                if (errBox) errBox.classList.remove('hidden');
+                if (statusCam) statusCam.innerHTML = `<span class="text-red-400">⚠️</span> <span class="text-red-300">Kamera tidak dikesan (Mod Tetikus Diaktifkan)</span>`;
+                state.mouseFallback = true;
+                if (launchBtn) {
+                    launchBtn.disabled = false;
+                    launchBtn.className = "virtual-btn w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-tech font-black text-base tracking-wider border-2 border-white cursor-pointer";
+                    launchBtn.textContent = "BUKA NOTA KATA ADJEKTIF ➔";
+                }
+            }
+        }
+
+        function countFourFingers(lm) {
+            let count = 0;
+            const tips = [8, 12, 16, 20];
+            const pips = [6, 10, 14, 18];
+            for (let i = 0; i < 4; i++) {
+                if (lm[tips[i]].y < lm[pips[i]].y - 0.025) count++;
+            }
+            return count;
+        }
+
+        function countAllFiveFingers(lm) {
+            let count = countFourFingers(lm);
+            // Semak ibu jari terbuka (jarak hujung ibu jari #4 ke pangkal jari kelingking #17 lebih besar berbanding sendi #3)
+            const thumbTipDist = Math.hypot(lm[4].x - lm[17].x, lm[4].y - lm[17].y);
+            const thumbIpDist = Math.hypot(lm[3].x - lm[17].x, lm[3].y - lm[17].y);
+            if (thumbTipDist > thumbIpDist * 1.15) {
+                count++;
+            }
+            return count;
+        }
+
+        function detectMission2HandGesture(hands, poseLm) {
+            // 1. Jika 2 tangan dikesan dalam bingkai kamera:
+            if (hands.length >= 2) {
+                const h1Wrist = hands[0][0];
+                const h2Wrist = hands[1][0];
+                const h1Middle = hands[0][9];
+                const h2Middle = hands[1][9];
+
+                const wristDist = Math.hypot(h1Wrist.x - h2Wrist.x, h1Wrist.y - h2Wrist.y);
+                const palmDist = Math.hypot(h1Middle.x - h2Middle.x, h1Middle.y - h2Middle.y);
+
+                // D. Buat tangan bentuk maaf 🙏 (kedua-dua tapak tangan / pergelangan tangan dirapatkan di tengah)
+                if (wristDist < 0.16 && palmDist < 0.15) {
+                    return { letter: 'D', label: 'Isyarat Maaf 🙏 (D)' };
+                }
+
+                // A. Angkat dua tangan (kedua-dua tangan berjarak / diangkat ke atas)
+                const bothHandsRaised = poseLm
+                    ? (h1Wrist.y < poseLm[11].y + 0.08 && h2Wrist.y < poseLm[12].y + 0.08)
+                    : (h1Wrist.y < 0.72 && h2Wrist.y < 0.72);
+
+                if (bothHandsRaised && wristDist >= 0.18) {
+                    return { letter: 'A', label: 'Angkat Dua Tangan 🙌 (A)' };
+                }
+            }
+
+            // 2. Analisis isyarat satu tangan utama (Penumbuk vs Lima ✋)
+            const h = hands[0];
+            const totalFingers = countAllFiveFingers(h);
+            const fourFingers = countFourFingers(h);
+
+            // C. Buat tangan bentuk lima ✋ (kelima-lima jari dibuka)
+            if (totalFingers === 5) {
+                return { letter: 'C', label: 'Tangan Lima ✋ (C)' };
+            }
+
+            // B. Buat tangan bentuk penumbuk (semua jari digenggam rapat)
+            if (fourFingers === 0) {
+                // Pastikan hujung jari telunjuk dekat dengan tapak tangan (#0) supaya tidak keliru dengan cubitan
+                const foldedDist = Math.hypot(h[8].x - h[0].x, h[8].y - h[0].y);
+                const mcpDist = Math.hypot(h[5].x - h[0].x, h[5].y - h[0].y);
+                if (foldedDist < mcpDist * 1.15) {
+                    return { letter: 'B', label: 'Penumbuk ✊ (B)' };
+                }
+            }
+
+            return { letter: null, label: 'Mengesan Isyarat...' };
+        }
+
+        /**
+         * ============================================================================
+         * GELUNG PENGESANAN KAMERA MASA NYATA (MEDIAPIPE HAND & POSE)
+         * ============================================================================
+         */
+        async function predictWebcamLoop() {
+            if (!videoEl || !canvasEl || !canvasCtx) {
+                requestAnimationFrame(predictWebcamLoop);
+                return;
+            }
+
+            if (canvasEl.width !== videoEl.videoWidth || canvasEl.height !== videoEl.videoHeight) {
+                canvasEl.width = videoEl.videoWidth || 1280;
+                canvasEl.height = videoEl.videoHeight || 720;
+            }
+
+            const nowInMs = performance.now();
+            if (videoEl.currentTime !== lastVideoTime) {
+                lastVideoTime = videoEl.currentTime;
+                canvasCtx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+                let handResults = null;
+                let poseResults = null;
+
+                if (handLandmarker) {
+                    handResults = handLandmarker.detectForVideo(videoEl, nowInMs);
+                }
+                if (poseLandmarker) {
+                    poseResults = poseLandmarker.detectForVideo(videoEl, nowInMs);
+                }
+
+                const dotHand = document.getElementById('dot-hand');
+                const dotPose = document.getElementById('dot-pose');
+                const handCountLabel = document.getElementById('hand-count-label');
+                const cursorEl = document.getElementById('virtual-cursor');
+                const cursorRing = document.getElementById('cursor-ring');
+
+                const hands = (handResults && handResults.landmarks) ? handResults.landmarks : [];
+                const poseLm = (poseResults && poseResults.landmarks && poseResults.landmarks.length > 0) ? poseResults.landmarks[0] : null;
+
+                if (handCountLabel) handCountLabel.textContent = hands.length;
+
+                if (poseLm) {
+                    if (dotPose) dotPose.className = "w-2.5 h-2.5 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]";
+                } else {
+                    if (dotPose) dotPose.className = "w-2.5 h-2.5 rounded-full bg-red-500";
+                }
+
+                if (hands.length > 0) {
+                    if (dotHand) dotHand.className = "w-2.5 h-2.5 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]";
+
+                    hands.forEach((lm, idx) => {
+                        drawHandSkeleton(lm, idx === 0 ? '#22d3ee' : '#fbbf24');
+                    });
+
+                    // Gunakan jari telunjuk (#8) dan ibu jari (#4) tangan utama sebagai kursor maya & cubitan
+                    const primaryHand = hands[0];
+                    const indexTip = primaryHand[8];
+                    const thumbTip = primaryHand[4];
+
+                    // Cerminkan paksi X kerana paparan video dicerminkan (-scale-x-100)
+                    const screenX = (1 - indexTip.x) * window.innerWidth;
+                    const screenY = indexTip.y * window.innerHeight;
+
+                    // Penapisan pelicinan kursor (EMA smoothing) supaya kursor stabil
+                    state.cursorX = state.cursorX * 0.45 + screenX * 0.55;
+                    state.cursorY = state.cursorY * 0.45 + screenY * 0.55;
+
+                    if (cursorEl) {
+                        cursorEl.classList.remove('hidden');
+                        cursorEl.classList.add('flex');
+                        cursorEl.style.left = `${state.cursorX}px`;
+                        cursorEl.style.top = `${state.cursorY}px`;
+                    }
+
+                    highlightElementUnderCursor(state.cursorX, state.cursorY);
+
+                    // Pengesanan Gerakan Cubitan (Jarak Ibu Jari #4 & Jari Telunjuk #8)
+                    const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+                    const PINCH_THRESHOLD = 0.055;
+                    const RELEASE_THRESHOLD = 0.085;
+
+                    if (pinchDist < PINCH_THRESHOLD) {
+                        if (cursorRing) cursorRing.style.opacity = '1';
+                        if (cursorEl) {
+                            cursorEl.style.width = '28px';
+                            cursorEl.style.height = '28px';
+                            cursorEl.style.backgroundColor = 'rgba(251, 191, 36, 0.65)';
+                        }
+
+                        // Satu cubitan hanya menghasilkan satu tindakan sehingga dilepaskan
+                        if (!state.pinchLocked) {
+                            state.pinchLocked = true;
+                            triggerVirtualClickAt(state.cursorX, state.cursorY);
+                        }
+                    } else if (pinchDist > RELEASE_THRESHOLD) {
+                        state.pinchLocked = false;
+                        if (cursorRing) cursorRing.style.opacity = '0';
+                        if (cursorEl) {
+                            cursorEl.style.width = '38px';
+                            cursorEl.style.height = '38px';
+                            cursorEl.style.backgroundColor = 'rgba(34, 211, 238, 0.35)';
+                        }
+                    }
+
+                    // Jika panel soalan sedang dibuka, kesan jawapan mengikut Misi 1 atau Misi 2
+                    if (state.screen === 'question' && !state.questionAnswered) {
+                        const qData = QUESTIONS_V2[state.questionIndex];
+                        if (qData && qData.mission === 1) {
+                            const fingerCount = countFourFingers(primaryHand);
+                            const mapLetter = { 1: 'A', 2: 'B', 3: 'C', 4: 'D' };
+                            const detected = mapLetter[fingerCount] || null;
+                            updateGestureAnswerProgress(
+                                detected,
+                                detected ? `${fingerCount} Jari (${detected})` : `${fingerCount} Jari`
+                            );
+                        } else if (qData && qData.mission === 2) {
+                            const res = detectMission2HandGesture(hands, poseLm);
+                            updateGestureAnswerProgress(res.letter, res.label);
+                        }
+                    }
+                } else {
+                    if (dotHand) dotHand.className = "w-2.5 h-2.5 rounded-full bg-red-500";
+                    if (!state.mouseFallback && cursorEl) {
+                        cursorEl.classList.add('hidden');
+                        cursorEl.classList.remove('flex');
+                    }
+                    if (state.screen === 'question' && !state.questionAnswered) {
+                        updateGestureAnswerProgress(null, 'Tiada Tangan');
+                    }
+                }
+            }
+
+            requestAnimationFrame(predictWebcamLoop);
+        }
+
+        function drawHandSkeleton(landmarks, color) {
+            canvasCtx.fillStyle = color;
+            landmarks.forEach(pt => {
+                const x = pt.x * canvasEl.width;
+                const y = pt.y * canvasEl.height;
+                canvasCtx.beginPath();
+                canvasCtx.arc(x, y, 4, 0, Math.PI * 2);
+                canvasCtx.fill();
+            });
+        }
+
+        function updateGestureAnswerProgress(detectedLetter, labelText) {
+            const labelEl = document.getElementById('detected-gesture-label');
+            const barEl = document.getElementById('gesture-hold-bar');
+            labelEl.textContent = labelText;
+
+            if (!detectedLetter) {
+                state.currentDetectedGesture = null;
+                state.gestureHoldStart = 0;
+                barEl.style.width = '0%';
+                return;
+            }
+
+            if (state.currentDetectedGesture !== detectedLetter) {
+                state.currentDetectedGesture = detectedLetter;
+                state.gestureHoldStart = performance.now();
+                barEl.style.width = '0%';
+            } else {
+                const elapsed = performance.now() - state.gestureHoldStart;
+                const pct = Math.min(100, (elapsed / state.gestureHoldDuration) * 100);
+                barEl.style.width = `${pct}%`;
+
+                if (elapsed >= state.gestureHoldDuration) {
+                    const letterMap = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+                    processQuizAnswer(letterMap[detectedLetter]);
+                }
+            }
+        }
+
+        /**
+         * ============================================================================
+         * INTERAKSI KURSOR MAYA DENGAN BUTANG, PAPAN MATCH-3 & I.R.I.S. JATUH
+         * ============================================================================
+         */
+        let lastHoveredEl = null;
+
+        function highlightElementUnderCursor(x, y) {
+            const el = document.elementFromPoint(x, y);
+            const interactive = el ? el.closest('.virtual-btn, .match-cell, .falling-iris') : null;
+
+            if (lastHoveredEl && lastHoveredEl !== interactive) {
+                lastHoveredEl.classList.remove('hovered');
+            }
+            if (interactive) {
+                interactive.classList.add('hovered');
+            }
+            lastHoveredEl = interactive;
+        }
+
+        function triggerVirtualClickAt(x, y) {
+            const el = document.elementFromPoint(x, y);
+            if (!el) return;
+
+            // 1. Jika dalam Misi 3 (I.R.I.S. Jatuh)
+            const irisEl = el.closest('.falling-iris');
+            if (irisEl && state.screen === 'iris_fall') {
+                handleIrisTap(irisEl.dataset.irisId);
+                return;
+            }
+
+            // 2. Jika klik pada sel papan padanan 3
+            const cell = el.closest('.match-cell');
+            if (cell && state.screen === 'playing') {
+                const r = parseInt(cell.dataset.r, 10);
+                const c = parseInt(cell.dataset.c, 10);
+                handleCellSelect(r, c);
+                return;
+            }
+
+            // 3. Jika klik pada butang maya
+            const btn = el.closest('[data-action]');
+            if (btn && !btn.disabled) {
+                handleAction(btn.dataset.action);
+                return;
+            }
+
+            // 4. Jika klik pada kad pilihan soalan
+            const optCard = el.closest('[id^="q-opt-"]');
+            if (optCard && state.screen === 'question' && !state.questionAnswered) {
+                const idx = parseInt(optCard.id.replace('q-opt-', ''), 10);
+                processQuizAnswer(idx);
+            }
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        /**
+         * ============================================================================
+         * PENDAFTARAN EVENT LISTENER KLIK & MOD TETIKUS SANDARAN
+         * ============================================================================
+         */
+        window.onload = function () {
+            document.querySelectorAll('[data-action]').forEach(btn => {
+                // Butang "SAYA SUDAH FAHAM — MULA MISI" (data-pinch-only="true") hanya boleh dipilih menggunakan kursor jari telunjuk maya + gerakan cubitan
+                if (btn.dataset.pinchOnly === 'true') return;
+                btn.addEventListener('click', () => {
+                    if (!btn.disabled) handleAction(btn.dataset.action);
+                });
+            });
+
+            const fallbackBtn = document.getElementById('btn-fallback-mouse');
+            fallbackBtn.addEventListener('click', () => {
+                state.mouseFallback = !state.mouseFallback;
+                fallbackBtn.textContent = `Mod Tetikus: ${state.mouseFallback ? 'ON' : 'OFF'}`;
+                const cursorEl = document.getElementById('virtual-cursor');
+                if (state.mouseFallback) {
+                    cursorEl.classList.remove('hidden');
+                    cursorEl.classList.add('flex');
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (state.mouseFallback) {
+                    state.cursorX = e.clientX;
+                    state.cursorY = e.clientY;
+                    const cursorEl = document.getElementById('virtual-cursor');
+                    cursorEl.style.left = `${state.cursorX}px`;
+                    cursorEl.style.top = `${state.cursorY}px`;
+                    highlightElementUnderCursor(state.cursorX, state.cursorY);
+                }
+            });
+        };
+    </script>
+</body>
+</html>
